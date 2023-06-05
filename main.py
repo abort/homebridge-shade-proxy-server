@@ -38,7 +38,8 @@ def error_400_handler(error):
 
 @app.route('/api/disconnect', methods=['GET'])
 def disconnect_api():
-    total = loop.run_until_complete(disconnect_all())
+    task = loop.create_task(disconnect_all())
+    total = loop.run_until_complete(task)
 
     return { "total_disconnected": total }
 
@@ -57,7 +58,8 @@ def write_api():
     # expect hexadecimal payload like copied from a Wireshark: adbacd02c0010601
     buffer = bytearray([ int(g, 16) for g in textwrap.wrap(payload, 2) ])
 
-    loop.run_until_complete(write(mac_address, buffer))
+    task = loop.create_task(write(mac_address, buffer))
+    loop.run_until_complete(task)
     return { "result": "ok" }
 
 def disconnect_callback(client):
