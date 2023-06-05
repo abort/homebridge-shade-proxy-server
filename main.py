@@ -4,6 +4,9 @@ from threading import Lock
 from bleak import BleakClient
 import textwrap
 import uuid
+import nest_asyncio
+
+nest_asyncio.apply()
 
 app = Flask(__name__)
 app.config['PROPAGATE_EXCEPTIONS'] = True
