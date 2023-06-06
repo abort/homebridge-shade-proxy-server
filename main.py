@@ -5,6 +5,7 @@ from bleak import BleakClient
 import textwrap
 import uuid
 import nest_asyncio
+import atexit
 
 nest_asyncio.apply()
 
@@ -50,20 +51,41 @@ def disconnect_api():
 def count_connections_api():
     return { "total": len(connections) }
 
-
-@app.route("/api/write", methods=['POST'])
-def write_api():
+@app.route("/api/brightness", methods=['POST'])
+def set_brightness_api():
     verify_json(request)
     data = request.json
     mac_address = data['address']
-    payload = data['payload']
+    device_id = data['deviceId']
+    payload_prefix = data['payloadPrefix']
+    value = int(data['value'])
 
+    intensity = 0x080000 + int((0x084e20 - 0x080000) / 100 * value)
+    write_payload(mac_address, payload_prefix, device_id, intensity.to_bytes(3, "big").hex())
+    return { "result": "ok" }
+
+@app.route("/api/toggle", methods=['POST'])
+def toggle_api():
+    verify_json(request)
+    data = request.json
+    mac_address = data['address']
+    device_id = data['deviceId']
+    payload_prefix = data['payloadPrefix']
+    value = data['value']
+
+    toggle_value = 0x0600 | int(value)
+    write_payload(mac_address, payload_prefix, device_id, toggle_value.to_bytes(2, "big").hex())
+    return { "result": "ok" }
+
+def write_payload(mac_address, payload_prefix, device_id, specific_payload):
+    payload = payload_prefix + device_id + specific_payload
+
+    app.logger.info("Writing payload: %s to %s", payload, mac_address)
     # expect hexadecimal payload like copied from a Wireshark: adbacd02c0010601
     buffer = bytearray([ int(g, 16) for g in textwrap.wrap(payload, 2) ])
 
     task = loop.create_task(write(mac_address, buffer))
-    loop.run_until_complete(task)
-    return { "result": "ok" }
+    loop.run_until_complete(task)  
 
 def disconnect_callback(client):
     app.logger.info("Disconnected client")
@@ -104,8 +126,22 @@ def verify_json(request):
     if "address" not in data:
         app.logger.error("bte mac address not in json body")
         abort(400)
-    if "payload" not in data:
-        app.logger.error("bte payload not in json body")
+    if "payloadPrefix" not in data:
+        app.logger.error("bte payload prefix not in json body")
         abort(400)
+    if "deviceId" not in data:
+        app.logger.error("bte device id not in json body")
+        abort(400)
+    if "value" not in data:
+        app.logger.error("value to set not in json body")
+        abort(400)        
+
+def on_exit():
+    task = loop.create_task(disconnect_all())
+    total = loop.run_until_complete(task)
+    loop.close()
+
+atexit.register(on_exit)
 
 app.register_error_handler(400, error_400_handler)
+
