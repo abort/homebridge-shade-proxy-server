@@ -16,6 +16,9 @@ connections = dict()
 lock = Lock()
 loop = asyncio.new_event_loop()
 
+def remove_hex_prefix(s):
+    return s.removeprefix('0x')
+
 async def disconnect_all():
     total = 0
     with lock:
@@ -56,8 +59,8 @@ def set_brightness_api():
     verify_json(request)
     data = request.json
     mac_address = data['address']
-    device_id = data['deviceId']
-    payload_prefix = data['payloadPrefix']
+    device_id = remove_hex_prefix(data['deviceId'])
+    payload_prefix = remove_hex_prefix(data['payloadPrefix'])
     value = int(data['value'])
 
     intensity = 0x080000 + int((0x084e20 - 0x080000) / 100 * value)
@@ -69,8 +72,8 @@ def toggle_api():
     verify_json(request)
     data = request.json
     mac_address = data['address']
-    device_id = data['deviceId']
-    payload_prefix = data['payloadPrefix']
+    device_id = remove_hex_prefix(data['deviceId'])
+    payload_prefix = remove_hex_prefix(data['payloadPrefix'])
     value = data['value']
 
     toggle_value = 0x0600 | int(value)
